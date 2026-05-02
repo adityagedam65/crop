@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integrated Farm Sensor Dashboard</title>
+  <style>
+    :root {
+      --bg: #f4f6f7;
+      --surface: #ffffff;
+      --text: #17212b;
+      --muted: #687780;
+      --line: #dce3e7;
+      --primary: #1f6f62;
+      --primary-dark: #18544a;
+      --temp: #d1762d;
+      --humidity: #2878c8;
+      --moisture: #23865b;
+      --ph: #6954b6;
+      --npk: #9a6a28;
+      --danger: #b73535;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 22px 24px;
+    }
+
+    .header-inner {
+      align-items: center;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+      margin: 0 auto;
+      max-width: 1180px;
+    }
+
+    h1 {
+      font-size: 28px;
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    .status {
+      color: #e9fff8;
+      font-size: 14px;
+      text-align: right;
+    }
+
+    main {
+      margin: 0 auto;
+      max-width: 1180px;
+      padding: 24px;
+    }
+
+    .toolbar {
+      align-items: center;
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .toolbar p {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    button {
+      background: var(--primary);
+      border: 0;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 700;
+      min-height: 40px;
+      padding: 0 16px;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+    }
+
+    .metrics {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 126px;
+      padding: 16px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      display: block;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 32px;
+      line-height: 1;
+      overflow-wrap: anywhere;
+    }
+
+    .metric small {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .temp strong {
+      color: var(--temp);
+    }
+
+    .humidity strong {
+      color: var(--humidity);
+    }
+
+    .moisture strong {
+      color: var(--moisture);
+    }
+
+    .ph strong {
+      color: var(--ph);
+    }
+
+    .npk strong {
+      color: var(--npk);
+    }
+
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      min-width: 1120px;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 12px 14px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #edf3f2;
+      color: #394844;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    td {
+      font-size: 14px;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .empty,
+    .error {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-top: 16px;
+      padding: 16px;
+    }
+
+    .error {
+      border-color: #e3b0b0;
+      color: var(--danger);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 920px) {
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 580px) {
+      .header-inner,
+      .toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .status {
+        text-align: left;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Integrated Farm Sensor Dashboard</h1>
+      <div class="status" id="status">Waiting for ESP32 data</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <p>Temperature, humidity, soil moisture, pH, and NPK saved to MySQL</p>
+      <button id="refreshButton" type="button">Refresh</button>
+    </div>
+
+    <section class="metrics" aria-label="Latest sensor values">
+      <div class="metric temp">
+        <span>Temperature</span>
+        <strong id="temperature">--</strong>
+        <small id="temperatureTime">Celsius</small>
+      </div>
+      <div class="metric humidity">
+        <span>Humidity</span>
+        <strong id="humidity">--</strong>
+        <small id="humidityTime">Percent</small>
+      </div>
+      <div class="metric moisture">
+        <span>Soil Moisture</span>
+        <strong id="soilMoisture">--</strong>
+        <small id="soilMoistureTime">Percent</small>
+      </div>
+      <div class="metric ph">
+        <span>pH</span>
+        <strong id="ph">--</strong>
+        <small id="phTime">Level</small>
+      </div>
+      <div class="metric npk">
+        <span>Nitrogen</span>
+        <strong id="nitrogen">--</strong>
+        <small id="nitrogenTime">N</small>
+      </div>
+      <div class="metric npk">
+        <span>Phosphorus</span>
+        <strong id="phosphorus">--</strong>
+        <small id="phosphorusTime">P</small>
+      </div>
+      <div class="metric npk">
+        <span>Potassium</span>
+        <strong id="potassium">--</strong>
+        <small id="potassiumTime">K</small>
+      </div>
+      <div class="metric">
+        <span>Saved Rows</span>
+        <strong id="rowCount">0</strong>
+        <small>recent rows shown</small>
+      </div>
+    </section>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Source</th>
+            <th>Temp</th>
+            <th>Humidity</th>
+            <th>Soil</th>
+            <th>Soil Raw</th>
+            <th>pH</th>
+            <th>pH Raw</th>
+            <th>N</th>
+            <th>P</th>
+            <th>K</th>
+          </tr>
+        </thead>
+        <tbody id="readingsBody"></tbody>
+      </table>
+    </div>
+
+    <div class="empty hidden" id="emptyState">No integrated sensor readings saved yet.</div>
+    <div class="error hidden" id="errorBox"></div>
+  </main>
+
+  <script>
+    const fields = {
+      temperature: document.getElementById("temperature"),
+      humidity: document.getElementById("humidity"),
+      soilMoisture: document.getElementById("soilMoisture"),
+      ph: document.getElementById("ph"),
+      nitrogen: document.getElementById("nitrogen"),
+      phosphorus: document.getElementById("phosphorus"),
+      potassium: document.getElementById("potassium"),
+      temperatureTime: document.getElementById("temperatureTime"),
+      humidityTime: document.getElementById("humidityTime"),
+      soilMoistureTime: document.getElementById("soilMoistureTime"),
+      phTime: document.getElementById("phTime"),
+      nitrogenTime: document.getElementById("nitrogenTime"),
+      phosphorusTime: document.getElementById("phosphorusTime"),
+      potassiumTime: document.getElementById("potassiumTime"),
+    };
+
+    const readingsBody = document.getElementById("readingsBody");
+    const emptyState = document.getElementById("emptyState");
+    const errorBox = document.getElementById("errorBox");
+    const refreshButton = document.getElementById("refreshButton");
+    const status = document.getElementById("status");
+    const rowCount = document.getElementById("rowCount");
+    const API_BASE = window.location.protocol === "file:" ? "http://127.0.0.1:5010" : "";
+
+    function formatValue(value, decimals = 1, suffix = "") {
+      const number = Number(value);
+      return Number.isFinite(number) ? `${number.toFixed(decimals)}${suffix}` : "--";
+    }
+
+    function formatTime(time, fallback) {
+      return time ? `Last: ${time}` : fallback;
+    }
+
+    function setMetric(latest, key, element, timeElement, decimals, suffix, fallback) {
+      const item = latest[key] || {};
+      element.textContent = formatValue(item.value, decimals, suffix);
+      timeElement.textContent = formatTime(item.received_at, fallback);
+    }
+
+    function setLatest(latest) {
+      setMetric(latest, "temperature", fields.temperature, fields.temperatureTime, 1, " C", "Celsius");
+      setMetric(latest, "humidity", fields.humidity, fields.humidityTime, 1, "%", "Percent");
+      setMetric(latest, "soil_moisture", fields.soilMoisture, fields.soilMoistureTime, 1, "%", "Percent");
+      setMetric(latest, "ph", fields.ph, fields.phTime, 2, "", "Level");
+      setMetric(latest, "nitrogen", fields.nitrogen, fields.nitrogenTime, 0, "", "N");
+      setMetric(latest, "phosphorus", fields.phosphorus, fields.phosphorusTime, 0, "", "P");
+      setMetric(latest, "potassium", fields.potassium, fields.potassiumTime, 0, "", "K");
+    }
+
+    function cell(value, decimals = 1, suffix = "") {
+      return formatValue(value, decimals, suffix);
+    }
+
+    function renderRows(readings) {
+      readingsBody.innerHTML = readings.map((reading) => `
+        <tr>
+          <td>${reading.received_at || "--"}</td>
+          <td>${reading.source || "--"}</td>
+          <td>${cell(reading.temperature, 1, " C")}</td>
+          <td>${cell(reading.humidity, 1, "%")}</td>
+          <td>${cell(reading.soil_moisture, 1, "%")}</td>
+          <td>${cell(reading.soil_raw_value, 0)}</td>
+          <td>${cell(reading.ph, 2)}</td>
+          <td>${cell(reading.ph_raw_value, 0)}</td>
+          <td>${cell(reading.nitrogen, 0)}</td>
+          <td>${cell(reading.phosphorus, 0)}</td>
+          <td>${cell(reading.potassium, 0)}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadReadings() {
+      errorBox.classList.add("hidden");
+
+      try {
+        const response = await fetch(`${API_BASE}/api/readings?limit=20`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Could not load readings");
+        }
+
+        const readings = payload.readings || [];
+        emptyState.classList.toggle("hidden", readings.length > 0);
+        rowCount.textContent = payload.count || 0;
+        renderRows(readings);
+        setLatest(payload.latest || {});
+
+        status.textContent = readings.length > 0 ? `Last row: ${readings[0].received_at}` : "Waiting for ESP32 data";
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.classList.remove("hidden");
+        status.textContent = "Connection error";
+      }
+    }
+
+    refreshButton.addEventListener("click", loadReadings);
+    loadReadings();
+    setInterval(loadReadings, 5000);
+  </script>
+</body>
+</html>
